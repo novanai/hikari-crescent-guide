@@ -27,12 +27,14 @@ miru.load(bot)
 bot.plugins.load_folder("plugins")
 
 
-@bot.listen()
+@bot.include
+@crescent.event
 async def on_starting(event: hikari.StartingEvent) -> None:
     bot.aio_session = aiohttp.ClientSession()
 
 
-@bot.listen()
+@bot.include
+@crescent.event
 async def on_stopping(event: hikari.StoppingEvent) -> None:
     await bot.aio_session.close()
 
@@ -66,6 +68,30 @@ async def announce(
     )
 
     await ctx.respond(f"Announcement posted to <#{channel.id}>!", ephemeral=True)
+
+@bot.include
+@crescent.command(name="announce2", description="Make an announcement!")
+class Announce:
+    message = crescent.option(str, "The message to announce.")
+    image = crescent.option(hikari.Attachment, "Announcement attachment.")
+    channel = crescent.option(hikari.TextableChannel, "Channel to post announcement to.")
+    ping = crescent.option(hikari.Role, "Role to ping with announcement.")
+
+    async def callback(self, ctx: crescent.Context) -> None:
+        embed = hikari.Embed(
+            title="Announcement!",
+            description=self.message,
+        )
+        embed.set_image(self.image)
+
+        await ctx.app.rest.create_message(
+            content=self.ping.mention,
+            channel=self.channel.id,
+            embed=embed,
+            role_mentions=True,
+        )
+
+        await ctx.respond(f"Announcement posted to <#{self.channel.id}>!", ephemeral=True)
 
 
 if __name__ == "__main__":
