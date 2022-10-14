@@ -9,17 +9,13 @@ plugin = crescent.Plugin()
 
 
 @plugin.include
-@crescent.command(name="userinfo", description="Get info on a server member.")
+@crescent.command(name="userinfo", description="Get info on a server member.", dm_enabled=False)
 async def userinfo(
     ctx: crescent.Context,
     user: Atd[Optional[hikari.User], "The user to get information about."] = None,
 ) -> None:
-    if not (guild := ctx.guild):
-        await ctx.respond("This command may only be used in servers.")
-        return
-
     user = user or ctx.user
-    user = ctx.app.cache.get_member(guild, user)
+    user = ctx.app.cache.get_member(ctx.guild, user)
 
     if not user:
         await ctx.respond("That user is not in the server.")

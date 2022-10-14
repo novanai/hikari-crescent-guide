@@ -17,11 +17,7 @@ async def on_cooldown(ctx: crescent.Context, time_remaining: float) -> None:
 
 
 async def check_permissions(ctx: crescent.Context) -> Union[crescent.HookResult, None]:
-    if not ctx.member:
-        await ctx.respond("This command may only be used in servers.")
-        return crescent.HookResult(exit=True)
-
-    elif not (
+    if not (
         toolbox.calculate_permissions(ctx.member, ctx.channel)
         & hikari.Permissions.MANAGE_MESSAGES
     ):
@@ -34,7 +30,7 @@ async def check_permissions(ctx: crescent.Context) -> Union[crescent.HookResult,
     cooldowns.cooldown(1, 5, callback=on_cooldown)
 )  # 1 use every 5 seconds per user
 @crescent.hook(check_permissions)
-@crescent.command(name="purge", description="Purge messages.")
+@crescent.command(name="purge", description="Purge messages.", dm_enabled=False)
 async def purge_messages(
     ctx: crescent.Context, messages: Atd[int, "The number of messages to purge."]
 ) -> None:
