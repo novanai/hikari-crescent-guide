@@ -40,9 +40,9 @@ async def on_stopping(event: hikari.StoppingEvent) -> None:
 
 
 @bot.include
-@crescent.command(name="ping", description="The bot's ping")
+@crescent.command(name="ping", description="The bot's ping.")
 async def ping(ctx: crescent.Context) -> None:
-    await ctx.respond(f"Pong! Latency: {bot.heartbeat_latency*1000:.2f}ms")
+    await ctx.respond(f"Pong! Latency: {bot.heartbeat_latency*1000:.2f}ms.")
 
 
 @bot.include
@@ -69,12 +69,15 @@ async def announce(
 
     await ctx.respond(f"Announcement posted to <#{channel.id}>!", ephemeral=True)
 
+
 @bot.include
 @crescent.command(name="announce2", description="Make an announcement!")
 class Announce:
     message = crescent.option(str, "The message to announce.")
     image = crescent.option(hikari.Attachment, "Announcement attachment.")
-    channel = crescent.option(hikari.TextableChannel, "Channel to post announcement to.")
+    channel = crescent.option(
+        hikari.TextableChannel, "Channel to post announcement to."
+    )
     ping = crescent.option(hikari.Role, "Role to ping with announcement.")
 
     async def callback(self, ctx: crescent.Context) -> None:
@@ -91,7 +94,9 @@ class Announce:
             role_mentions=True,
         )
 
-        await ctx.respond(f"Announcement posted to <#{self.channel.id}>!", ephemeral=True)
+        await ctx.respond(
+            f"Announcement posted to <#{self.channel.id}>!", ephemeral=True
+        )
 
 
 if __name__ == "__main__":
