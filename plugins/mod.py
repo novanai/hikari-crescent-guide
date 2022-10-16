@@ -1,6 +1,5 @@
 import asyncio
-from typing import Annotated as Atd
-from typing import Union
+from typing import Annotated as Atd, Optional
 
 import crescent
 import hikari
@@ -16,7 +15,7 @@ async def on_cooldown(ctx: crescent.Context, time_remaining: float) -> None:
     )
 
 
-async def check_permissions(ctx: crescent.Context) -> Union[crescent.HookResult, None]:
+async def check_permissions(ctx: crescent.Context) -> Optional[crescent.HookResult]:
     if not (
         toolbox.calculate_permissions(ctx.member, ctx.channel)
         & hikari.Permissions.MANAGE_MESSAGES
@@ -31,17 +30,21 @@ async def check_permissions(ctx: crescent.Context) -> Union[crescent.HookResult,
 )  # 1 use every 5 seconds per user
 @crescent.hook(check_permissions)
 @crescent.command(name="purge", description="Purge messages.", dm_enabled=False)
-async def purge_messages(
-    ctx: crescent.Context, messages: Atd[int, "The number of messages to purge."]
-) -> None:
-    channel = ctx.channel_id
+class Purge:
+    messages = crescent.option(int, "The number of messages to purge.")
+    
+    async def callback(
+        self,
+        ctx: crescent.Context
+    ) -> None:
+        channel = ctx.channel_id
 
-    msgs = await ctx.app.rest.fetch_messages(channel).limit(messages)
-    await ctx.app.rest.delete_messages(channel, msgs)
+        msgs = await ctx.app.rest.fetch_messages(channel).limit(self.messages)
+        await ctx.app.rest.delete_messages(channel, msgs)
 
-    msg = await ctx.respond(f"{len(msgs)} messages deleted.", ensure_message=True)
-    await asyncio.sleep(5)
-    await msg.delete()
+        msg = await ctx.respond(f"{len(msgs)} messages deleted.", ensure_message=True)
+        await asyncio.sleep(5)
+        await msg.delete()
 
 
 @plugin.include

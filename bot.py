@@ -1,6 +1,5 @@
 import asyncio
 import os
-from typing import Annotated as Atd
 
 import aiohttp
 import crescent
@@ -47,38 +46,13 @@ async def ping(ctx: crescent.Context) -> None:
 
 @bot.include
 @crescent.command(name="announce", description="Make an announcement!")
-async def announce(
-    ctx: crescent.Context,
-    message: Atd[str, "The message to announce."],
-    image: Atd[hikari.Attachment, "Announcement attachment."],
-    channel: Atd[hikari.TextableChannel, "Channel to post announcement to."],
-    ping: Atd[hikari.Role, "Role to ping with announcement."],
-) -> None:
-    embed = hikari.Embed(
-        title="Announcement!",
-        description=message,
-    )
-    embed.set_image(image)
-
-    await ctx.app.rest.create_message(
-        content=ping.mention,
-        channel=channel.id,
-        embed=embed,
-        role_mentions=True,
-    )
-
-    await ctx.respond(f"Announcement posted to <#{channel.id}>!", ephemeral=True)
-
-
-@bot.include
-@crescent.command(name="announce2", description="Make an announcement!")
 class Announce:
     message = crescent.option(str, "The message to announce.")
-    image = crescent.option(hikari.Attachment, "Announcement attachment.")
     channel = crescent.option(
         hikari.TextableChannel, "Channel to post announcement to."
     )
-    ping = crescent.option(hikari.Role, "Role to ping with announcement.")
+    image = crescent.option(hikari.Attachment, "Announcement attachment.", default=None)
+    ping = crescent.option(hikari.Role, "Role to ping with announcement.", default=None)
 
     async def callback(self, ctx: crescent.Context) -> None:
         embed = hikari.Embed(
@@ -88,7 +62,7 @@ class Announce:
         embed.set_image(self.image)
 
         await ctx.app.rest.create_message(
-            content=self.ping.mention,
+            content=self.ping.mention if self.ping else None,
             channel=self.channel.id,
             embed=embed,
             role_mentions=True,
