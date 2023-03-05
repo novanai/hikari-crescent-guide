@@ -4,12 +4,14 @@ import crescent
 import hikari
 import miru
 
-plugin = crescent.Plugin()
+import model
+
+plugin = crescent.Plugin[hikari.GatewayBot, model.Model]()
 
 
 fun_group = crescent.Group(
     name="fun",
-    description="All the entertainment commands you'll ever need.",
+    description="All the entertainment commands you'll ever need!",
 )
 
 
@@ -17,45 +19,50 @@ fun_group = crescent.Group(
 @fun_group.child
 @crescent.command(name="meme", description="Get a meme!")
 async def meme_subcommand(ctx: crescent.Context) -> None:
-    async with ctx.app.aio_session.get(
-        "https://meme-api.herokuapp.com/gimme"
-    ) as response:
-        res = await response.json()
-        if response.ok and res["nsfw"] != True:
-            link = res["postLink"]
-            title = res["title"]
-            img_url = res["url"]
+    async with plugin.model.client_session.get("https://meme-api.com/gimme") as res:
+        if not res.ok:
+            await ctx.respond(
+                f"API returned a {res.status} status :c",
+                ephemeral=True,
+            )
+            return
 
-            embed = hikari.Embed(colour=0x3B9DFF)
-            embed.set_author(name=title, url=link)
-            embed.set_image(img_url)
+        data = await res.json()
 
-            await ctx.respond(embed)
+        if data["nsfw"]:
+            await ctx.respond(
+                "Response was NSFW, couldn't send :c",
+                ephemeral=True,
+            )
+            return
 
-        else:
-            await ctx.respond("Could not fetch a meme :c", ephemeral=True)
+        embed = hikari.Embed(colour=0x3B9DFF)
+        embed.set_author(name=data["title"], url=data["postLink"])
+        embed.set_image(data["url"])
+
+        await ctx.respond(embed)
 
 
 ANIMALS = {
-    "Dog": "🐶",
-    "Cat": "🐱",
-    "Panda": "🐼",
-    "Fox": "🦊",
-    "Red Panda": "🐼",
-    "Koala": "🐨",
     "Bird": "🐦",
-    "Racoon": "🦝",
+    "Cat": "🐱",
+    "Dog": "🐶",
+    "Fox": "🦊",
     "Kangaroo": "🦘",
+    "Koala": "🐨",
+    "Panda": "🐼",
+    "Raccoon": "🦝",
+    "Red Panda": "🐼",
 }
 
 
 @plugin.include
 @fun_group.child
-@crescent.command(name="animal", description="Get a fact + picture of a cute animal :3")
+@crescent.command(name="animal", description="Get a fact & picture of a cute animal :3")
 async def animal_subcommand(ctx: crescent.Context) -> None:
     select_menu = (
-        ctx.app.rest.build_action_row()
-        .add_select_menu("animal_select")
+        plugin.app.rest.build_message_action_row()
+        .add_select_menu(hikari.ComponentType.TEXT_SELECT_MENU, "animal_select")
         .set_placeholder("Pick an animal")
     )
 
@@ -72,33 +79,32 @@ async def animal_subcommand(ctx: crescent.Context) -> None:
     )
 
     try:
-        event = await ctx.app.wait_for(
+        event = await plugin.app.wait_for(
             hikari.InteractionCreateEvent,
             timeout=60,
             predicate=lambda e: isinstance(e.interaction, hikari.ComponentInteraction)
             and e.interaction.user.id == ctx.user.id
             and e.interaction.message.id == msg.id
-            and e.interaction.component_type == hikari.ComponentType.SELECT_MENU,
+            and e.interaction.component_type == hikari.ComponentType.TEXT_SELECT_MENU,
         )
     except asyncio.TimeoutError:
-        await msg.edit("The menu timed out :c", components=[])
+        await ctx.edit("The menu timed out :c", components=[])
     else:
         animal = event.interaction.values[0]
-        async with ctx.app.aio_session.get(
+        async with plugin.model.client_session.get(
             f"https://some-random-api.ml/animal/{animal}"
         ) as res:
-            if res.ok:
-                res = await res.json()
-                embed = hikari.Embed(description=res["fact"], colour=0x3B9DFF)
-                embed.set_image(res["image"])
+            if not res.ok:
+                await ctx.edit(f"API returned a {res.status} status :c", components=[])
+                return
 
-                animal = animal.replace("_", " ")
+            data = await res.json()
+            embed = hikari.Embed(description=data["fact"], colour=0x3B9DFF)
+            embed.set_image(data["image"])
 
-                await msg.edit(
-                    f"Here's a {animal} for you! :3", embed=embed, components=[]
-                )
-            else:
-                await msg.edit(f"API returned a {res.status} status :c", components=[])
+            animal = animal.replace("_", " ")
+
+            await ctx.edit(f"Here's a {animal} for you! :3", embed=embed, components=[])
 
 
 class AnimalView(miru.View):
@@ -106,45 +112,40 @@ class AnimalView(miru.View):
         self.author = author
         super().__init__(timeout=60)
 
-    @miru.select(
+    @miru.text_select(
         custom_id="animal_select",
         placeholder="Pick an animal",
         options=[
-            miru.SelectOption("Dog", "dog", emoji="🐶"),
-            miru.SelectOption("Cat", "cat", emoji="🐱"),
-            miru.SelectOption("Panda", "panda", emoji="🐼"),
-            miru.SelectOption("Fox", "fox", emoji="🦊"),
-            miru.SelectOption("Red Panda", "red_panda", emoji="🐼"),
-            miru.SelectOption("Koala", "koala", emoji="🐨"),
-            miru.SelectOption("Bird", "bird", emoji="🐦"),
-            miru.SelectOption("Racoon", "racoon", emoji="🦝"),
-            miru.SelectOption("Kangaroo", "kangaroo", emoji="🦘"),
+            miru.SelectOption(name, name.lower().replace(" ", "_"), emoji=emoji)
+            for name, emoji in ANIMALS.items()
         ],
     )
-    async def select_menu(self, select: miru.Select, ctx: miru.Context) -> None:
+    async def select_menu(self, select: miru.TextSelect, ctx: miru.ViewContext) -> None:
         animal = select.values[0]
-        async with ctx.app.aio_session.get(
+        async with plugin.model.client_session.get(
             f"https://some-random-api.ml/animal/{animal}"
         ) as res:
-            if res.ok:
-                res = await res.json()
-                embed = hikari.Embed(description=res["fact"], colour=0x3B9DFF)
-                embed.set_image(res["image"])
-
-                animal = animal.replace("_", " ")
-
-                await ctx.edit_response(
-                    f"Here's a {animal} for you! :3", embed=embed, components=[]
-                )
-            else:
+            if not res.ok:
                 await ctx.edit_response(
                     f"API returned a {res.status} status :c", components=[]
                 )
+                return
+
+            data = await res.json()
+            embed = hikari.Embed(description=data["fact"], colour=0x3B9DFF)
+            embed.set_image(data["image"])
+
+            animal = animal.replace("_", " ")
+
+            await ctx.edit_response(
+                f"Here's a {animal} for you! :3", embed=embed, components=[]
+            )
 
     async def on_timeout(self) -> None:
+        assert self.message is not None
         await self.message.edit("The menu timed out :c", components=[])
 
-    async def view_check(self, ctx: miru.Context) -> bool:
+    async def view_check(self, ctx: miru.ViewContext) -> bool:
         return ctx.user.id == self.author.id
 
 
@@ -161,5 +162,5 @@ async def animal_subcommand_2(ctx: crescent.Context) -> None:
         ensure_message=True,
     )
 
-    view.start(msg)
+    await view.start(msg)
     await view.wait()

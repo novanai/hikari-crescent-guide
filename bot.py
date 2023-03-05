@@ -1,50 +1,38 @@
-import asyncio
 import os
-
-import aiohttp
+import model
 import crescent
 import dotenv
 import hikari
 import miru
+from hikari import Intents
 
 dotenv.load_dotenv()
 
-
-class Bot(crescent.Bot):
-    def __init__(self):
-        self.aio_session: aiohttp.ClientSession
-
-        super().__init__(
-            os.environ["BOT_TOKEN"],
-            intents=hikari.Intents.ALL,
-            banner=None,
-        )
+INTENTS = Intents.GUILD_MEMBERS | Intents.GUILDS
 
 
-bot = Bot()
-miru.load(bot)
-bot.plugins.load_folder("plugins")
+bot = hikari.GatewayBot(
+    os.environ["BOT_TOKEN"],
+    intents=INTENTS,
+    banner=None,
+)
+miru.install(bot)
+
+client_model = model.Model()
+client = crescent.Client(bot, client_model)
+client.plugins.load_folder("plugins")
+
+bot.subscribe(hikari.StartingEvent, client_model.on_starting)
+bot.subscribe(hikari.StoppingEvent, client_model.on_stopping)
 
 
-@bot.include
-@crescent.event
-async def on_starting(event: hikari.StartingEvent) -> None:
-    bot.aio_session = aiohttp.ClientSession()
-
-
-@bot.include
-@crescent.event
-async def on_stopping(event: hikari.StoppingEvent) -> None:
-    await bot.aio_session.close()
-
-
-@bot.include
+@client.include
 @crescent.command(name="ping", description="The bot's ping.")
-async def ping(ctx: crescent.Context) -> None:
-    await ctx.respond(f"Pong! Latency: {bot.heartbeat_latency*1000:.2f}ms.")
+async def ping_cmd(ctx: crescent.Context) -> None:
+    await ctx.respond(f"Pong! Latency: {bot.heartbeat_latency * 1000:.2f}ms.")
 
 
-@bot.include
+@client.include
 @crescent.command(name="announce", description="Make an announcement!")
 class Announce:
     message = crescent.option(str, "The message to announce.")
@@ -62,8 +50,8 @@ class Announce:
         embed.set_image(self.image)
 
         await ctx.app.rest.create_message(
-            content=self.ping.mention if self.ping else None,
             channel=self.channel.id,
+            content=self.ping.mention if self.ping else hikari.UNDEFINED,
             embed=embed,
             role_mentions=True,
         )
@@ -74,9 +62,4 @@ class Announce:
 
 
 if __name__ == "__main__":
-    if os.name == "nt":
-        # we are running on a Windows machine, and we have to add this so
-        # the code doesn't error :< (it most likely will error without this)
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-
     bot.run()

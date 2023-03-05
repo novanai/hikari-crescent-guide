@@ -1,50 +1,65 @@
 import asyncio
-from typing import Annotated as Atd, Optional
 
 import crescent
 import hikari
-import toolbox
+import datetime
 from crescent.ext import cooldowns
 
-plugin = crescent.Plugin()
+import model
+
+plugin = crescent.Plugin[hikari.GatewayBot, model.Model]()
 
 
-async def on_cooldown(ctx: crescent.Context, time_remaining: float) -> None:
+async def on_cooldown(
+    ctx: crescent.Context, time_remaining: datetime.timedelta
+) -> None:
     await ctx.respond(
-        f"This command is on cooldown! You can use it again in {int(time_remaining)} seconds."
+        f"This command is on cooldown! You can use it again in {int(time_remaining.total_seconds())} seconds."
     )
-
-
-async def check_permissions(ctx: crescent.Context) -> Optional[crescent.HookResult]:
-    if not (
-        toolbox.calculate_permissions(ctx.member, ctx.channel)
-        & hikari.Permissions.MANAGE_MESSAGES
-    ):
-        await ctx.respond("You do not have permission to use this command.")
-        return crescent.HookResult(exit=True)
 
 
 @plugin.include
 @crescent.hook(
-    cooldowns.cooldown(1, 5, callback=on_cooldown)
+    cooldowns.cooldown(1, datetime.timedelta(seconds=5), callback=on_cooldown)
 )  # 1 use every 5 seconds per user
-@crescent.hook(check_permissions)
-@crescent.command(name="purge", description="Purge messages.", dm_enabled=False)
+@crescent.command(
+    name="purge",
+    description="Purge messages.",
+    dm_enabled=False,
+    default_member_permissions=hikari.Permissions.MANAGE_MESSAGES,
+)
 class Purge:
-    messages = crescent.option(int, "The number of messages to purge.")
-    
-    async def callback(
-        self,
-        ctx: crescent.Context
-    ) -> None:
-        channel = ctx.channel_id
+    messages = crescent.option(
+        int, "The number of messages to purge.", min_value=2, max_value=200
+    )
+    sent_by = crescent.option(
+        hikari.User, "Only purge messages sent by this user.", default=None
+    )
 
-        msgs = await ctx.app.rest.fetch_messages(channel).limit(self.messages)
-        await ctx.app.rest.delete_messages(channel, msgs)
+    async def callback(self, ctx: crescent.Context) -> None:
+        bulk_delete_limit = datetime.datetime.now(
+            datetime.timezone.utc
+        ) - datetime.timedelta(days=14)
 
-        msg = await ctx.respond(f"{len(msgs)} messages deleted.", ensure_message=True)
+        iterator = (
+            plugin.app.rest.fetch_messages(ctx.channel_id)
+            .take_while(lambda msg: msg.created_at > bulk_delete_limit)
+            .filter(lambda msg: not (msg.flags & hikari.MessageFlag.LOADING))
+        )
+        if self.sent_by:
+            iterator = iterator.filter(lambda msg: msg.author.id == self.sent_by.id)
+
+        iterator = iterator.limit(self.messages)
+
+        count = 0
+
+        async for messages in iterator.chunk(100):
+            count += len(messages)
+            await plugin.app.rest.delete_messages(ctx.channel_id, messages)
+
+        await ctx.respond(f"{count} messages deleted.")
         await asyncio.sleep(5)
-        await msg.delete()
+        await ctx.delete()
 
 
 @plugin.include

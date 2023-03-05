@@ -1,36 +1,36 @@
 from datetime import datetime
-from typing import Annotated as Atd
-from typing import Optional
 
 import crescent
 import hikari
 
-plugin = crescent.Plugin()
+import model
+
+plugin = crescent.Plugin[hikari.GatewayBot, model.Model]()
 
 
 @plugin.include
-@crescent.command(name="userinfo", description="Get info on a server member.", dm_enabled=False)
+@crescent.command(
+    name="userinfo", description="Get info on a server member.", dm_enabled=False
+)
 class UserInfo:
-    user = crescent.option(hikari.User, "The user to get information about.", default=None)
+    user = crescent.option(
+        hikari.User, "The user to get information about.", default=None
+    )
 
-    async def callback(
-        self,
-        ctx: crescent.Context,
-    ) -> None:
+    async def callback(self, ctx: crescent.Context) -> None:
+        assert ctx.guild_id is not None
+
         user = self.user or ctx.user
-        user = ctx.app.cache.get_member(ctx.guild, user)
+        user = plugin.app.cache.get_member(ctx.guild_id, user)
 
         if not user:
-            await ctx.respond("That user is not in the server.")
+            await ctx.respond("That user is not in this server.")
             return
 
         created_at = int(user.created_at.timestamp())
         joined_at = int(user.joined_at.timestamp())
 
-        roles = (await user.fetch_roles())[1:]  # All but @everyone
-        roles = sorted(
-            roles, key=lambda role: role.position, reverse=True
-        )  # sort them by position, then reverse the order to go from top role down
+        roles = [f"<@&{role}>" for role in user.role_ids if role != ctx.guild_id]
 
         embed = (
             hikari.Embed(
@@ -40,7 +40,7 @@ class UserInfo:
                 timestamp=datetime.now().astimezone(),
             )
             .set_footer(
-                text=f"Requested by {ctx.user.username}",
+                text=f"Requested by {ctx.user}",
                 icon=ctx.user.display_avatar_url,
             )
             .set_thumbnail(user.avatar_url)
@@ -61,7 +61,7 @@ class UserInfo:
             )
             .add_field(
                 "Roles",
-                ", ".join(r.mention for r in roles),
+                ", ".join(roles) if roles else "No roles",
                 inline=False,
             )
         )
