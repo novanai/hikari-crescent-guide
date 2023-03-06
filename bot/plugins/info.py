@@ -3,7 +3,7 @@ from datetime import datetime
 import crescent
 import hikari
 
-import model
+from bot import model
 
 plugin = crescent.Plugin[hikari.GatewayBot, model.Model]()
 

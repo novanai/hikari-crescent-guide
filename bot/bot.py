@@ -1,5 +1,5 @@
 import os
-import model
+from bot import model
 import crescent
 import dotenv
 import hikari
@@ -20,7 +20,7 @@ miru.install(bot)
 
 client_model = model.Model()
 client = crescent.Client(bot, client_model)
-client.plugins.load_folder("plugins")
+client.plugins.load_folder("bot.plugins")
 
 bot.subscribe(hikari.StartingEvent, client_model.on_starting)
 bot.subscribe(hikari.StoppingEvent, client_model.on_stopping)
@@ -59,7 +59,3 @@ class Announce:
         await ctx.respond(
             f"Announcement posted to <#{self.channel.id}>!", ephemeral=True
         )
-
-
-if __name__ == "__main__":
-    bot.run()

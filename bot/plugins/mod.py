@@ -5,7 +5,7 @@ import hikari
 import datetime
 from crescent.ext import cooldowns
 
-import model
+from bot import model
 
 plugin = crescent.Plugin[hikari.GatewayBot, model.Model]()
 

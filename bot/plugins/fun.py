@@ -4,7 +4,7 @@ import crescent
 import hikari
 import miru
 
-import model
+from bot import model
 
 plugin = crescent.Plugin[hikari.GatewayBot, model.Model]()
 
