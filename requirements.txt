@@ -1,4 +1,4 @@
-hikari[speedups]==2.0.0.dev116
+hikari[speedups]==2.0.0.dev117
 hikari-crescent[cooldowns]==0.6.0
 hikari-miru==3.0.2
 python-dotenv==1.0.0
